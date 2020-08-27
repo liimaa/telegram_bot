@@ -25,6 +25,7 @@ bot.on("document", async ({ document, chat }) => {
     await bot.sendVideo(chat.id, filepath, { disable_notification: true })
     media_clenup(filepath)
   } catch (error) {
+    media_clenup(filepath)
     console.log(error)
   }
 })

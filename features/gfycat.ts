@@ -3,7 +3,20 @@ import { media_clenup } from "../util"
 import config from "../config"
 import fs from "fs"
 
-const auth = async () => {
+ interface IAuth {
+  scope: string
+  expires_in: number
+  access_token: string
+ }
+
+ interface ICreate_upload_url {
+  isOk: boolean
+  gfyname: string
+  secret: string
+  uploadType: string
+ }
+
+const auth = async (): Promise<IAuth> => {
   const response = await axios({
     method: "POST",
     url: "https://api.gfycat.com/v1/oauth/token",
@@ -16,7 +29,7 @@ const auth = async () => {
   return response.data
 }
 
-const create_upload_url = async (filename: string): Promise<string> => {
+const create_upload_url = async (filename: string): Promise<ICreate_upload_url> => {
   const response = await axios({
     method: "POST",
     url: "https://api.gfycat.com/v1/gfycats",
@@ -26,10 +39,10 @@ const create_upload_url = async (filename: string): Promise<string> => {
       keepAudio: true,
     },
     headers: {
-      Authorization: `Bearer ${(await auth()).data.access_token}`,
+      Authorization: `Bearer ${(await auth()).access_token}`,
     },
   })
-  return response.data.gfyname
+  return response.data
 }
 
 const upload = async (filepath: string, gfycatUrl: string) => {
@@ -53,7 +66,7 @@ const url_status = async (gfycatUrl: string) => {
   const response = await axios({
     url: `https://api.gfycat.com/v1/gfycats/fetch/status/${gfycatUrl}`,
     headers: {
-      Authorization: `Bearer ${(await auth()).data.access_token}`,
+      Authorization: `Bearer ${(await auth()).access_token}`,
     },
   })
   return response.data
@@ -88,22 +101,32 @@ const responseTypes = data => {
   return false
 }
 
+const waitForUrl = (filepath, gfycatUrl): Promise<string> => {
+  let count = 0
+  return new Promise((resolve, reject) => {
+    let interval = setInterval(async () => {
+      if(count > 10) {
+        clearInterval(interval)
+        reject()
+      }
+      const status = await url_status(gfycatUrl)
+      if (status.md5Found !== 1 && !status.content_urls) return
+      const video_url = responseTypes(status)
+      if (video_url) {
+        clearInterval(interval)
+        media_clenup(filepath)
+        resolve(video_url)
+      }
+      count++
+    }, 5000)
+  })
+}
+
 const uploadGfycat = async function (filepath: string, filename: string): Promise<string> {
   try {
-    const gfycatUrl = await create_upload_url(filename)
+    const gfycatUrl = (await create_upload_url(filename)).gfyname
     await upload(filepath, gfycatUrl)
-    return new Promise((resolve, reject) => {
-      let interval = setInterval(async () => {
-        const status = await url_status(gfycatUrl)
-        if (status.md5Found !== 1 && !status.content_urls) return
-        const video_url = responseTypes(status)
-        if (video_url) {
-          clearInterval(interval)
-          resolve(video_url)
-          media_clenup(filepath)
-        }
-      }, 5000)
-    })
+    return waitForUrl(filepath, gfycatUrl)
   } catch (error) {
     console.log("Gfycat error", error)
     media_clenup(filepath)

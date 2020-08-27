@@ -49,11 +49,61 @@ const upload = async (filepath: string, gfycatUrl: string) => {
   return response.data
 }
 
-const uploadGfycat = async function (filepath: string, filename: string) {
+const url_status = async (gfycatUrl: string) => {
+  const response = await axios({
+    url: `https://api.gfycat.com/v1/gfycats/fetch/status/${gfycatUrl}`,
+    headers: {
+      Authorization: `Bearer ${(await auth()).data.access_token}`,
+    },
+  })
+  return response.data
+}
+
+const responseTypes = data => {
+  // video
+  if (data.content_urls && data.content_urls.mp4 && data.content_urls.mp4.url) {
+    return data.content_urls.mp4.url
+  } else if (
+    data.content_urls &&
+    data.content_urls.mobile &&
+    data.content_urls.mobile.url
+  ) {
+    return data.content_urls.mobile.url
+  }
+  // gif
+  if (data.mp4Url && !data.hasAudio) {
+    return data.mp4Url
+  } else if (data.mobileUrl && !data.hasAudio) {
+    return data.mobileUrl
+    // fallbacks
+  } else if (data.miniUrl) {
+    return data.miniUrl
+  }
+  if (data.task === "complete") {
+    return `https://giant.gfycat.com/${data.gfycatFilepath}.mp4`
+  }
+  console.log(
+    `could not found matching url | clear https://gfycat.com/${data.gfycatFilepath}`
+  )
+  return false
+}
+
+const uploadGfycat = async function (filepath: string, filename: string): Promise<string> {
   try {
     const gfycatUrl = await create_upload_url(filename)
     await upload(filepath, gfycatUrl)
-    media_clenup(filepath)
+    return new Promise((resolve, reject) => {
+      let interval = setInterval(async () => {
+        const status = await url_status(gfycatUrl)
+        if (status.md5Found !== 1 && !status.content_urls) return
+        const video_url = responseTypes(status)
+        if (video_url) {
+          clearInterval(interval)
+          resolve(video_url)
+          media_clenup(filepath)
+        }
+      }, 5000)
+    })
   } catch (error) {
     console.log("Gfycat error", error)
     media_clenup(filepath)

@@ -4,6 +4,7 @@ import constants from "./constants"
 import { removeFileExt, convert_media, media_clenup } from "./util"
 import { uploadGfycat } from "./features/gfycat"
 import { feed } from "./features/hackernews"
+import { yammerMsgById } from "./features/yammer"
 
 const bot = new TelegramBot(config.BOT_TOKEN, { polling: true })
 
@@ -42,14 +43,30 @@ bot.onText(new RegExp('(https?:\\/\\/news\\.ycombinator\\.com\\/item\\?id=[\\d]+
   const data = await feed(id)
   // await bot.deleteMessage(chat.id, message_id.toString())
   bot.sendMessage(chat.id, 
-    "[" + from.username + "]:" + " " + link + "\n" +
+    link + "\n" +
     data.title + "\nscore " +
     data.score + " | " + data.type + " | " +
-    '[article link]' + '(' + data.url + ') | /m',
+    '[article link]' + '(' + data.url + ')',
     { 
       parse_mode: "Markdown",
       disable_notification : true,
       disable_web_page_preview: true,
     }
   )
+})
+
+bot.onText(new RegExp('.*www\.yammer\.com\/.*\/threads\/show.*'), async({ chat, message_id, text}) => {
+  try {
+    const response = await yammerMsgById(text.replace(/[^0-9]/g, ""))
+    bot.sendMessage(chat.id, 
+      text + 
+      "\n" +
+      response.body.parsed +
+      "\n"
+    )
+    // await bot.deleteMessage(chat.id, message_id.toString())
+    // console.log("Deleted yammer msg", message_id);
+  } catch (error) {
+    console.log("Yammer error", error);
+  }
 })

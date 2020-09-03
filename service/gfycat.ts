@@ -1,6 +1,6 @@
 import axios from "axios"
 import { media_clenup } from "../util"
-import config from "../config"
+import { config } from "../config"
 import fs from "fs"
 
  interface IAuth {

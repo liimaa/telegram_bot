@@ -1,10 +1,14 @@
-import config from "./config"
+import { config } from "./config"
 import TelegramBot from "node-telegram-bot-api"
 import constants from "./constants"
-import { removeFileExt, convert_media, media_clenup } from "./util"
-import { uploadGfycat } from "./features/gfycat"
-import { feed } from "./features/hackernews"
-import { yammerMsgById } from "./features/yammer"
+import { removeFileExt, convert_media, media_clenup, progress } from "./util"
+import { uploadGfycat } from "./service/gfycat"
+import { feed } from "./service/hackernews"
+import { yammerMsgById } from "./service/yammer"
+import Axios from "axios"
+import path from 'path';
+import fs from 'fs';
+import url from 'url';
 
 const bot = new TelegramBot(config.BOT_TOKEN, { polling: true })
 
@@ -18,24 +22,54 @@ bot.on("document", async ({ document, chat }) => {
   if (!/[\w|\d]*\.webm/.test(document.file_name)) return
   const filename = removeFileExt(document.file_name)
   const filepath = `${constants.webm_dir}/${filename}.mp4`
-  console.log(filename, filepath, "\n")
-  try {
-    const mediaStream = bot.getFileStream(document.file_id)
-    await convert_media(mediaStream, filepath)
+  const mediaStream = bot.getFileStream(document.file_id)
+  const filesize = document.file_size 
 
-    if (document.file_size > config.MAXSIZEBYTES) {
-      const url = await uploadGfycat(filepath, filename)
-      bot.sendMessage(chat.id, url, { disable_notification: true })
-      return
-    } 
-    await bot.sendVideo(chat.id, filepath, { disable_notification: true })
-    media_clenup(filepath)
-  } catch (error) {
-    media_clenup(filepath)
-    console.log(error)
-  }
+  await convert_media(mediaStream, filepath).catch(console.error)
+
+  if (filesize > config.MAXSIZEBYTES) {
+    const url = await uploadGfycat(filepath, filename)
+    bot.sendMessage(chat.id, url, { disable_notification: true })
+      .catch(error => {
+        console.log(error.response.body)
+        media_clenup(filepath)
+      })
+    return
+  } 
+  bot.sendVideo(chat.id, filepath, { disable_notification: true })
+    .catch(error => {
+      console.log(error.response.body)
+      media_clenup(filepath)
+    })
 })
 
+
+bot.onText(new RegExp('https?:\\/\\/[^\\s]+.webm'), async ({ chat }, match) => {
+  const link = match[0]
+  const filename = path.basename(url.parse(match[0]).path)
+  const filepath = `${constants.webm_dir}/${filename}`
+  const file = fs.createWriteStream(filepath)
+
+  const { data, headers } = await Axios.get(link, { responseType: "stream" })
+  const size = Number(headers['content-length'])
+  
+  progress(data, size)
+  data.pipe(file)
+
+  file.on("close", async () => {
+      const mp4File = `${removeFileExt(filepath)}.mp4`
+      const readFile = fs.createReadStream(filepath)
+
+      await convert_media(readFile, mp4File, filepath).catch(console.error)
+      await bot.sendVideo(chat.id, mp4File, { disable_notification: true })
+        .catch(error => {
+          console.log(error.response.body)
+          media_clenup(mp4File)
+        })
+      media_clenup(mp4File)
+    })
+    .on("error", () => media_clenup(filepath))
+})
 
 bot.onText(new RegExp('(https?:\\/\\/news\\.ycombinator\\.com\\/item\\?id=[\\d]+)'), async({ chat, from, message_id }, match) => {
   const link = match[0]

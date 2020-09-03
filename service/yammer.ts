@@ -1,5 +1,5 @@
 import axios from "axios"
-import config from "../config"
+import { config } from "../config"
 
 const yammerMsgById = async(id) => {
   const response = await axios.get("https://www.yammer.com/api/v1/messages/" + id + ".json", {

@@ -8,4 +8,10 @@ const config = {
   YAMMER_ID: process.env.YAMMER_ID,
 }
 
-export default config
+const botConf = {
+  // ffmpeg conversion quality from best -> worst 0 - 48
+  convertQuality: parseInt(process.env.convertQuality) || 16,
+
+}
+
+export { config, botConf }

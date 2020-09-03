@@ -1,7 +1,7 @@
-import config from "./config"
+import { config } from "./config"
 import TelegramBot from "node-telegram-bot-api"
 import constants from "./constants"
-import { removeFileExt, convert_media, media_clenup } from "./util"
+import { removeFileExt, convert_media, media_clenup, progress } from "./util"
 import { uploadGfycat } from "./service/gfycat"
 import { feed } from "./service/hackernews"
 import { yammerMsgById } from "./service/yammer"
@@ -22,108 +22,54 @@ bot.on("document", async ({ document, chat }) => {
   if (!/[\w|\d]*\.webm/.test(document.file_name)) return
   const filename = removeFileExt(document.file_name)
   const filepath = `${constants.webm_dir}/${filename}.mp4`
-  console.log(filename, filepath, "\n")
-  try {
-    const mediaStream = bot.getFileStream(document.file_id)
-    await convert_media(mediaStream, filepath)
+  const mediaStream = bot.getFileStream(document.file_id)
+  const filesize = document.file_size 
 
-    if (document.file_size > config.MAXSIZEBYTES) {
-      const url = await uploadGfycat(filepath, filename)
-      bot.sendMessage(chat.id, url, { disable_notification: true })
-      return
-    } 
-    await bot.sendVideo(chat.id, filepath, { disable_notification: true })
-    media_clenup(filepath)
-  } catch (error) {
-    media_clenup(filepath)
-    console.log(error)
-  }
+  await convert_media(mediaStream, filepath).catch(console.error)
+
+  if (filesize > config.MAXSIZEBYTES) {
+    const url = await uploadGfycat(filepath, filename)
+    bot.sendMessage(chat.id, url, { disable_notification: true })
+      .catch(error => {
+        console.log(error.response.body)
+        media_clenup(filepath)
+      })
+    return
+  } 
+  bot.sendVideo(chat.id, filepath, { disable_notification: true })
+    .catch(error => {
+      console.log(error.response.body)
+      media_clenup(filepath)
+    })
 })
 
-bot.onText(new RegExp('https?:\\/\\/[^\\s]+.webm'), async ({ document, chat }, match) => {
+
+bot.onText(new RegExp('https?:\\/\\/[^\\s]+.webm'), async ({ chat }, match) => {
   const link = match[0]
-  const filename = path.basename(url.parse(match[0]).path);
-  const filepath = `${constants.webm_dir}/${filename}.mp4`
+  const filename = path.basename(url.parse(match[0]).path)
+  const filepath = `${constants.webm_dir}/${filename}`
+  const file = fs.createWriteStream(filepath)
 
-  const response = await Axios.get(link, { responseType: 'stream' })
-  response.data.pipe(fs.createWriteStream(filepath));
+  const { data, headers } = await Axios.get(link, { responseType: "stream" })
+  const size = Number(headers['content-length'])
+  
+  progress(data, size)
+  data.pipe(file)
 
+  file.on("close", async () => {
+      const mp4File = `${removeFileExt(filepath)}.mp4`
+      const readFile = fs.createReadStream(filepath)
 
-
-  // return
-  // const c = response.headers["content-disposition"]
-  // let filename = ""
-  // if(c && /^attachment/i.test(c)) {
-  //   filename = c.toLowerCase()
-  //     .split('filename=')[1]
-  //     .split(';')[0]
-  //     .replace(/"/g, '');
-  // } else {
-  //   filename = path.basename(url.parse(match[0]).path);
-  // }
-  // console.log(filename);
-  // const filepath = `${constants.webm_dir}/${filename}.mp4`
-  // fs.createWriteStream(filepath)
-
-
+      await convert_media(readFile, mp4File, filepath).catch(console.error)
+      await bot.sendVideo(chat.id, mp4File, { disable_notification: true })
+        .catch(error => {
+          console.log(error.response.body)
+          media_clenup(mp4File)
+        })
+      media_clenup(mp4File)
+    })
+    .on("error", () => media_clenup(filepath))
 })
-
-
-// telegram.onText(), function (msg, match) {
-//   let filename;
-//       let r = request(match[0]).on('response', function (res) {
-//           let contentDisp = res.headers['content-disposition'];
-//           if (contentDisp && /^attachment/i.test(contentDisp)) {
-//               filename = contentDisp.toLowerCase()
-//                   .split('filename=')[1]
-//                   .split(';')[0]
-//                   .replace(/"/g, '');
-//           } else {
-//               filename = path.basename(url.parse(match[0]).path);
-//           }
-//           console.log(filename);
-//           r.pipe(fs.createWriteStream(path.join(__dirname, filename)));
-//       });
-
-//       r.on('end', function () {
-//           ffmpeg(filename)
-//               .output(filename + '.mp4')
-//               .outputOptions('-strict -2') // Needed since axc is "experimental"
-//               .on('end', () => {
-//                   // Cleanup
-//                   fs.unlink(filename, (e) => {
-//                       if (e) {
-//                           console.error(e);
-//                       }
-//                   });
-//                   console.log('[webm2mp4] File', filename, 'converted - Uploading...');
-//                   telegram.sendVideo(msg.chat.id, filename + '.mp4', { disable_notification : true }).then(function() {
-//                       fs.unlink(filename + '.mp4', (e) => {
-//                           if (e) {
-//                               console.error(e);
-//                           }
-//                       });
-//                   });
-//               })
-//               .on('error', (e) => {
-//                   console.error(e);
-//                   // Cleanup
-//                   fs.unlink(filename, (err) => {
-//                       if (err) {
-//                           console.error(err);
-//                       }
-//                   });
-//                   fs.unlink(filename + '.mp4', (err) => {
-//                       if (err) {
-//                           console.error(err);
-//                       }
-//                   });
-//               })
-//               .run();
-//   });
-// });
-
-
 
 bot.onText(new RegExp('(https?:\\/\\/news\\.ycombinator\\.com\\/item\\?id=[\\d]+)'), async({ chat, from, message_id }, match) => {
   const link = match[0]

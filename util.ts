@@ -21,7 +21,11 @@ const convert_media = (stream, path, oldfile?): Promise<string> => {
 }
 
 const media_clenup = (path: string): void => {
-  fs.unlinkSync(path)
+  try {
+    fs.unlinkSync(path)
+  } catch (error) {
+    console.log(error)
+  }
 }
 
 const removeFileExt = (filename): string => {

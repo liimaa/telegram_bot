@@ -1,4 +1,4 @@
-import { config } from "./config"
+import { config, botConf } from "./config"
 import TelegramBot from "node-telegram-bot-api"
 import constants from "./constants"
 import { removeFileExt, convert_media, media_clenup, progress } from "./util"
@@ -28,8 +28,8 @@ bot.on("document", async ({ document, chat }) => {
   await convert_media(mediaStream, filepath).catch(console.error)
 
   if (filesize > config.MAXSIZEBYTES) {
-    const url = await uploadGfycat(filepath, filename)
-    bot.sendMessage(chat.id, url, { disable_notification: true })
+    const gfycatUrl = await uploadGfycat(filepath, filename)
+    bot.sendMessage(chat.id, gfycatUrl, { disable_notification: true })
       .catch(error => {
         console.log(error.response.body)
         media_clenup(filepath)
@@ -96,7 +96,9 @@ bot.onText(new RegExp('.*www\.yammer\.com\/.*\/threads\/show.*'), async({ chat, 
       text + 
       "\n" +
       response.body.parsed +
-      "\n"
+      "\n", {
+        disable_notification: true,
+      }
     )
     // await bot.deleteMessage(chat.id, message_id.toString())
     // console.log("Deleted yammer msg", message_id);
@@ -104,3 +106,48 @@ bot.onText(new RegExp('.*www\.yammer\.com\/.*\/threads\/show.*'), async({ chat, 
     console.log("Yammer error", error);
   }
 })
+
+bot.onText(new RegExp(/\/cmdlist|\/help/, 'g'), async({ chat, message_id }) => {
+  let cmdlist = 'Command <argument type | options | current option>\n' +
+    '\nTo set new options use: /command <options>\n' +
+    'Sample command: /convertQuality 1 sets quality to best\n' +
+    '\nCurrent commandlist:'
+  for (const key in botConf) {
+    cmdlist += `\n/${key} <${botConf[key][0]} | ${botConf[key][1]} | ${botConf[2]}>\n`
+  }
+  bot.sendMessage(chat.id, cmdlist, {
+    reply_to_message_id: message_id,
+    disable_notification: true,
+  })
+})
+
+
+for (let key in botConf) {
+  let [argumentType, options, currentOption] = botConf[key]
+  bot.onText(new RegExp(`(/${key}|/${key}@\\w+) (\\w+|\\d+)`, 'g'), async({ chat, text, message_id, from}) => {
+    const [command, params] = text.split(" ")
+    if(currentOption === params) {
+      const msg = `Error ! /${key} is already set to ${params}.`
+      bot.sendMessage(chat.id, msg, {
+        reply_to_message_id: message_id,
+        disable_notification: true,
+      })
+      console.log(`${msg} ${from.first_name}`);
+    } else if (argumentType.test(params)) {     
+      const msg = `Changed param /${key} ${currentOption} to ${params} successfully.`
+      currentOption = params
+      bot.sendMessage(chat.id, msg, {
+        reply_to_message_id: message_id,
+        disable_notification: true,
+      })
+      console.log(`${msg} ${from.first_name}`)
+    } else {
+      const msg = `Error ! Command uses type options: <${options}> !`
+      bot.sendMessage(chat.id, msg, {
+        reply_to_message_id: message_id,
+        disable_notification: true,
+      })
+      console.log(`${msg} ${from.first_name}`)
+    }
+  })
+}

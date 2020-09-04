@@ -15,12 +15,12 @@ const convert_media = (stream, path, oldfile?): Promise<string> => {
         if(oldfile) media_clenup(oldfile) 
         resolve()
       })
-      .outputOptions(`-r ${botConf.convertQuality}`)
+      .outputOptions(`-r ${botConf.convert_quality[2]}`)
       .save(path)
     })
 }
 
-const media_clenup = (path) => {
+const media_clenup = (path: string): void => {
   fs.unlinkSync(path)
 }
 
@@ -65,4 +65,11 @@ const progress = (data, size: number): void => {
 }
 
 
-export { removeFileExt, convert_media, media_clenup, logSize, progress, getFileSize }
+export {
+  removeFileExt,
+  convert_media,
+  media_clenup,
+  logSize,
+  progress,
+  getFileSize,
+}

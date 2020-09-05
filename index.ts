@@ -12,6 +12,7 @@ import url from 'url';
 
 const bot = new TelegramBot(config.BOT_TOKEN, { polling: true })
 
+// bot
 bot.on("text", msg => {
   const chatId = msg.chat.id
   bot.sendMessage(chatId, "Received your message")
@@ -42,6 +43,7 @@ bot.on("document", async ({ document, chat }) => {
       media_clenup(filepath)
     })
 })
+
 
 
 bot.onText(new RegExp('https?:\\/\\/[^\\s]+.webm'), async ({ chat }, match) => {
@@ -145,9 +147,32 @@ for (let key in botConf) {
       const msg = `Error ! Command uses type options: <${options}> !`
       bot.sendMessage(chat.id, msg, {
         reply_to_message_id: message_id,
-        disable_notification: true,
+        disable_notification: true, 
       })
       console.log(`${msg} ${from.first_name}`)
     }
   })
 }
+
+
+bot.onText(/\/game (.+)/, (msg, match) => {
+
+  const gameName: string = match[1]
+
+  Axios({
+    url: "https://api-v3.igdb.com/games",
+    method:"POST",
+    headers: {
+        'Accept': 'application/json',
+        'user-key': config.IGBD_TOKEN,
+    },
+    data:`fields name; search "${gameName}"; where version_parent = null;`
+  })
+    .then(response => {
+      console.log(response.data);
+      bot.sendMessage(msg.chat.id, JSON.stringify(response.data));
+    })
+    .catch(err => {
+      console.error("error",);
+    });
+});

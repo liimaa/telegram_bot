@@ -10,9 +10,13 @@ import path from 'path';
 import fs from 'fs';
 import url from 'url';
 
-const bot = new TelegramBot(config.BOT_TOKEN, {
-  webHook: { port: config.PORT, host: config.HOST },
-})
+const bot = new TelegramBot(config.BOT_TOKEN)
+if (config.WEBHOOK) {
+  bot.setWebHook(config.EXTERNAL_URL + ":443/bot" + config.BOT_TOKEN)
+} else {
+  bot.startPolling()
+}
+
 
 // bot.on("text", msg => {
 //   const chatId = msg.chat.id

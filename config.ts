@@ -8,6 +8,8 @@ const config = {
   YAMMER_ID: process.env.YAMMER_ID,
   PORT: parseInt(process.env.PORT),
   HOST: process.env.HOST,
+  EXTERNAL_URL: process.env.EXTERNAL_URL,
+  WEBHOOK: process.env.WEBHOOK,
 }
 
 

@@ -12,10 +12,10 @@ import url from 'url';
 
 const bot = new TelegramBot(config.BOT_TOKEN, { polling: true })
 
-bot.on("text", msg => {
-  const chatId = msg.chat.id
-  bot.sendMessage(chatId, "Received your message")
-})
+// bot.on("text", msg => {
+//   const chatId = msg.chat.id
+//   bot.sendMessage(chatId, "Received your message")
+// })
 
 // convert webm -> mp4
 bot.on("document", async ({ document, chat }) => {

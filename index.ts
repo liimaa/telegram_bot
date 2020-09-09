@@ -10,7 +10,10 @@ import path from 'path';
 import fs from 'fs';
 import url from 'url';
 
-const bot = new TelegramBot(config.BOT_TOKEN, { polling: true })
+const bot = new TelegramBot(config.BOT_TOKEN, {
+  polling: true,
+  webHook: { port: config.PORT, host: config.HOST },
+})
 
 // bot.on("text", msg => {
 //   const chatId = msg.chat.id

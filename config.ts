@@ -6,6 +6,8 @@ const config = {
   GFYCAT_client_id: process.env.GFYCAT_client_id,
   GFYCAT_client_secret: process.env.GFYCAT_client_secret,
   YAMMER_ID: process.env.YAMMER_ID,
+  PORT: parseInt(process.env.PORT),
+  HOST: process.env.HOST,
 }
 
 

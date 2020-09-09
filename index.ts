@@ -11,7 +11,6 @@ import fs from 'fs';
 import url from 'url';
 
 const bot = new TelegramBot(config.BOT_TOKEN, {
-  polling: true,
   webHook: { port: config.PORT, host: config.HOST },
 })
 

@@ -10,11 +10,20 @@ import path from 'path';
 import fs from 'fs';
 import url from 'url';
 
-const bot = new TelegramBot(config.BOT_TOKEN)
+
+let botOptions: any = {}
+if (config.WEBHOOK) {
+  botOptions.webHook = {
+    port: config.PORT || 5000,
+    host: "0.0.0.0",
+  }
+} else {
+  botOptions.polling = true
+}
+
+const bot = new TelegramBot(config.BOT_TOKEN, botOptions)
 if (config.WEBHOOK) {
   bot.setWebHook(config.EXTERNAL_URL + ":443/bot" + config.BOT_TOKEN)
-} else {
-  bot.startPolling()
 }
 
 
